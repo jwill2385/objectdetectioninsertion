@@ -28,6 +28,56 @@ classes = []
 with open(classFile, 'rt') as f:
     classes = f.read().rstrip('\n').split('\n')
 
+#This function takes in canny image and location of peg/hole and isolates region
+def img_mask(canny_image, left, top, right, bottom):
+    #Create empty image of same size
+    mask = np.zeros_like(canny_image)
+    #Fill in bounding box region
+    cv2.rectangle(mask, (left, top), (right, bottom), (255,255,255), -1)
+    # combine mask with canny image
+    masked_img = cv2.bitwise_and(canny_image, mask)
+    return masked_img
+
+
+#This function generates hough_transform_lines
+def hough_transform(img, lines, precise):
+    new_img = np.copy(img)
+    empty_img = np.zeros((new_img.shape[0], new_img.shape[1], 3), dtype=np.uint8)
+   
+    if not precise:
+
+        for line in lines:
+            rho, theta = line[0]
+            a = np.cos(theta)
+            b = np.sin(theta)
+
+            x0 = a * rho
+            y0 = b * rho
+
+            pt1 = (int(x0 + 1000*(-b)), int(y0 + 1000 * a))
+            pt2 = (int(x0 - 100*(-b)), int(y0 - 1000 * a))
+            cv2.line(empty_img, pt1, pt2, (255, 0, 255), 3)
+        #new_img = cv2.addWeighted(new_img, 0.8, empty_img, 1, 0, 0)
+    else:
+        #Precise is true so we used houghTransformP
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            cv2.line(empty_img, (x1,y1), (x2, y2), (255, 0, 255), 3)
+    return empty_img
+
+# This function does canny edge detection on image
+def canny_convert(img):
+  
+    #convert to greyscale
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    print(gray.shape)
+    #blur img
+    blur = cv2.GaussianBlur(gray, (5,5),0)
+    #Abstract edges
+    canny = cv2.Canny(blur, 10, 80, apertureSize = 3)
+    #canny = cv2.Canny(blur, 20, 70, apertureSize = 3)
+    return canny
+
 def postProcess(frame, outputs):
     #Will remove bounding box from obj with low confidence
     frameHeight = frame.shape[0]
@@ -37,6 +87,8 @@ def postProcess(frame, outputs):
     classIDs = []
     confidences = []
     boxes = []
+    #Image Processing for canny
+    canny_img = canny_convert(frame)
     #scan through every single bounding box and keep ones with highest confidence scores
     for out in outputs:
         for detection in out:
@@ -68,15 +120,27 @@ def postProcess(frame, outputs):
         top = box[1]
         width = box[2]
         height = box[3]
-        drawPred(classIDs[i], confidences[i], left, top, left + width, top + height)
+        frame = drawPred(classIDs[i], confidences[i], left, top, left + width, top + height, canny_img, frame) #Update image frame of interest with bbox and hough lines
+    return frame
 
 # This function will draw the predicted bounding box
-def drawPred(classId, conf, left, top, right, bottom):
+def drawPred(classId, conf, left, top, right, bottom, canny_image, frame):
     #Draw box
-    #print(classId)
     classId = classId % 2
     color = [int(c) for c in colors[classId]]
-    cv2.rectangle(color_frame, (left, top), (right, bottom), color, 2)
+
+    #Add hough transform logic before adding rectange
+    #Step 1 create a image mask isloating region of interest
+    mask = img_mask(canny_image, left, top, right, bottom)
+
+    #Step 2 generate hough lines
+    lines = cv2.HoughLinesP(mask, 1, np.pi/180, 90, minLineLength = 10, maxLineGap = 30)
+    #Step 3 perform hough transform
+    if lines is not None:
+        hough_lines = hough_transform(mask, lines, True)
+   
+    # Now add bounding box around actual image
+    cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
     
     label = '%.2f' % conf
     # get the label for the class name and its confidence
@@ -87,10 +151,13 @@ def drawPred(classId, conf, left, top, right, bottom):
     #Display the label at the top of the bounding box
     labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
     top = max(top, labelSize[1])
-    cv2.rectangle(color_frame, (left, top - round(1.5*labelSize[1])), (left + round(1.5*labelSize[0]), top + baseLine), (255, 255, 255), cv2.FILLED)
-    cv2.putText(color_frame, label, (left + 5, top + 2), 0, 0.5, (0, 0, 0), 2)
-
-
+    cv2.rectangle(frame, (left, top - round(1.5*labelSize[1])), (left + round(1.5*labelSize[0]), top + baseLine), (255, 255, 255), cv2.FILLED)
+    cv2.putText(frame, label, (left + 5, top + 2), 0, 0.5, (0, 0, 0), 2)
+    #Todo merge hough image with color frame
+    if lines is not None:
+        output = cv2.addWeighted(frame, 0.8, hough_lines, 1, 0, 0)
+        return output
+    return frame
 
 
 # Set up colors
@@ -138,9 +205,9 @@ while True:
     r = blob[0, 0, :, :]
 
     #Display blob in new window . Not needed
-    cv2.imshow('blob', r)
-    text = f'Blob shape={blob.shape}'
-    cv2.displayOverlay('blob', text)
+    #cv2.imshow('blob', r)
+    #text = f'Blob shape={blob.shape}'
+    #cv2.displayOverlay('blob', text)
 
     net.setInput(blob)  
     t0 = time.time()
@@ -151,11 +218,11 @@ while True:
 
  
     #now time to post process
-    postProcess(color_frame, outputs)
+    result_img = postProcess(color_frame, outputs)
 
     # Make sure to show image at very end so that it shows rectangles
     cv2.imshow("Depth_frame", depth_frame)
-    cv2.imshow("Color_frame", color_frame)
+    cv2.imshow("Color_frame", result_img)
 
     key = cv2.waitKey(1)
     if key == ord('q'):
