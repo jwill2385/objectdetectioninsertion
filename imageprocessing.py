@@ -11,6 +11,7 @@ import math
 
 #This function takes in an array of a [u,v,1] image point and converts into point in camera frame
 def convert_to_camera_frame(array):
+    #Also try with f = 1342.8
     fx = 919.84
     fy = 917.85
     ox = 640
@@ -23,17 +24,12 @@ def convert_to_camera_frame(array):
     c = math.cos(theta)
     s = math.sin(theta)
     world_to_camera_mat = [[1, 0, 0], [0, c, -s], [0, s, c]]
-    translation = [[-.179], [.3215], [.2281]]
+    translation = [-.179, .3215, .40308]
     translation = np.array(translation)
     world_to_camera_mat = np.array(world_to_camera_mat)
-    # add a 1 for the world transform
-    #np.append(cam_coor, [1], axis = 0)
-    #np.append(translation, [[1]], axis = 0)
-    world_coor =  np.dot(np.linalg.inv(world_to_camera_mat), np.subtract(cam_coor, translation))
-    #print("UV: ")
-    #print(image_cor)
-    print("Camer:")
-    print(cam_coor)
+  
+    world_coor =  np.dot(np.linalg.inv(world_to_camera_mat), cam_coor - translation)
+
     camera_xyz = [cam_coor[0], cam_coor[1], cam_coor[2]]
     world_xyz = [world_coor[0], world_coor[1], world_coor[2]]
     return camera_xyz
@@ -88,7 +84,7 @@ def load_img_from_folder(folder_path):
 def img_mask(image):
     mask = np.zeros_like(image)
     #For testing purposes we will fix the desireed area 
-    cv2.rectangle(mask, (551, 89), (870, 480), (255, 255, 255), -1)
+    cv2.rectangle(mask, (625, 541), (772, 717), (255, 255, 255), -1)
    
     #Show region to edit
     cv2.imshow('Mask_Frame', mask)
@@ -104,7 +100,7 @@ def img_mask(image):
 path = '/home/cvdarbeloff/Documents/Realsense/realsense_depth/Hole_exp_photos'
 #path = '/home/cvdarbeloff/Documents/Realsense/realsense_depth/photo_clear'
 images = load_img_from_folder(path)
-cur_img = images[0] # lets choose one image to work with
+cur_img = images[1] # lets choose one image to work with
 
 
 
@@ -127,7 +123,7 @@ for i, cnt in enumerate(contours):
     print(i, len(cnt))
     # print(cnt)
 # This is the contour of the ellipse (Second largest. Largest is mask frame)
-cnt = contours[6]
+cnt = contours[3]
 x = []
 y = []
 #Store x,y coordinate of all the points on ellipse here
@@ -152,9 +148,16 @@ for a in range(len(x)):
 camera_coordinates = np.array(camera_coordinates)
 
 fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.plot(camera_coordinates[:,0], camera_coordinates[:,1], camera_coordinates[:,2])
+#ax = fig.add_subplot(111, projection='3d')
+#ax.plot(camera_coordinates[:,0], camera_coordinates[:,1], camera_coordinates[:,2])
+hole_x_center = (np.max(camera_coordinates[:,0]) + np.min(camera_coordinates[:,0])) / 2  
+hole_y_center = (np.max(camera_coordinates[:,1]) + np.min(camera_coordinates[:,1])) / 2  
+hole_z_center = (np.max(camera_coordinates[:,2]) + np.min(camera_coordinates[:,2])) / 2  
+#ax.plot(hole_x_center, hole_y_center, hole_z_center, marker=".", markersize=10)
+#ax.legend('World coordinate system', 'Hole Center Location')
+plt.plot(camera_coordinates[:,0], camera_coordinates[:,1])
 plt.show()
+
 #method 2 to get ellipse
 ellipse = cv2.fitEllipse(cnt)
 draw_elipse = cv2.ellipse(cur_img, ellipse, (0,255,0),2)
