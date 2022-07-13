@@ -2,6 +2,7 @@ import cv2
 import os
 from cv2 import drawContours
 import numpy as np
+import math
 import matplotlib.pyplot as plt
 # This file extracts harris corner information from robot
 #Using SIFT we store corners of interest and then
@@ -40,15 +41,15 @@ def contonur_mask(img, cnt):
     mask= np.zeros_like(img) # we want all our images to be the same size
     cv2.drawContours(mask, [cnt], -1, (255,255,255), -1)
     #Show region to edit
-    print(mask.shape)
     # cv2.imshow('Mask_Frame', mask)
     # cv2.waitKey(0)
     masked_image = cv2.bitwise_and(img,mask)
 
-    # cv2.imshow("Mask Applied to Image", masked_image)
-    # cv2.waitKey(0)
-
+    cv2.imshow("Mask Applied to Image", masked_image)
+    cv2.waitKey(0)
+    cv2.destroyWindow('Mask Applied to Image')
     return masked_image
+
 #This function creates image mask over desired area
 def img_mask(image):
     mask = np.zeros_like(image)
@@ -68,8 +69,6 @@ def generate_moments(cur_img, large_contour):
     my_img = cur_img.copy()
     
    
-    
-
     #Pick contour corresponding to object
     #sort =  sorted(contours, key=cv2.contourArea, reverse=True) # This will sort contours in reverse order by area
     # large_contour = contours[0]
@@ -119,12 +118,32 @@ def generate_ellipse(img, contour):
     # print(M)
     cx = int(M['m10']/ M['m00'])
     cy = int(M['m01']/ M['m00'])
-    print('center xy = ', cx,':', cy)
+    print('center xy = ')
+    print(cx)
+    print(cy)
     #draw center
     cv2.circle(my_img, (cx, cy), 8, (0,0,255), -1)
+    ellipse = cv2.fitEllipse(contour)
+    draw_elipse = cv2.ellipse(my_img, ellipse, (0,0,255),2)
+    a = ellipse[1][0] / 2
+    b = ellipse[1][1] / 2
+    tilt_angle = ellipse[2]
+    major_axis = 0
+    minor_axis = 0
+    if (a > b):
+        major_axis = a
+        minor_axis = b
+    else:
+        major_axis = b
+        minor_axis = a
+
+    print("Ellipse Values")
+    print('Major, minor')
+    print(major_axis)
+    print(minor_axis)
     cv2.imshow('Color_Frame',my_img)
     cv2.waitKey(0)
-    # ellipse = cv2.fitEllipse(contour)
+    
     # draw_elipse = cv2.ellipse(img, ellipse, (0,255,0),2)
     # center_x = ellipse[0][0]
     # center_y = ellipse[0][1]
@@ -177,7 +196,7 @@ def generate_keypoints(img):
     #Testing getting corners w threshold img
     dst = cv2.cornerHarris(gray,2,3,0.04)
     #update identified corners to ones above threshold
-    ret, dst = cv2.threshold(dst,0.01*dst.max(),255,0)
+    ret, dst = cv2.threshold(dst,0.1*dst.max(),255,0)
     dst = np.uint8(dst)
     ret, labels, stats, centroids = cv2.connectedComponentsWithStats(dst)
     # define the criteria to stop and refine the corners
@@ -202,6 +221,7 @@ cv2.imshow('Color_Frame', ref_img)
 cv2.waitKey(0)
 #If needed crop image here before grayscale
 large_contour = find_largest_contour(ref_img)
+
 generate_corners(ref_img)
 generate_moments(ref_img, large_contour)
 print('NOW LOOKING AT INNER CONTOURS')
@@ -209,7 +229,7 @@ print('NOW LOOKING AT INNER CONTOURS')
 ref_img_iso = contonur_mask(ref_img, large_contour)
 analyze_circles(ref_img_iso)
 # img_2_iso = contonur_mask(img2, large_contour2 )
-# ref_keypoints, ref_img_copy = generate_keypoints(ref_img_iso)
+ref_keypoints, ref_img_copy = generate_keypoints(ref_img)
 # kp2, img2_copy = generate_keypoints(img_2_iso)
 
 
@@ -218,9 +238,9 @@ np.set_printoptions(threshold=np.inf)
 
 
 #Compute the SIFT descriptors from harris corner keypoints
-# sift = cv2.SIFT_create()
+sift = cv2.SIFT_create()
 
-# kp, des = sift.compute(ref_img_copy, ref_keypoints)
+kp, des = sift.compute(ref_img_copy, ref_keypoints)
 # kp2, des2 = sift.compute(img2_copy, kp2)
 # Feature matching
 #TODO Change feature matching formula
@@ -259,10 +279,10 @@ np.set_printoptions(threshold=np.inf)
 
 #When using Knn add drawMatchesKnn, otherwise just use drawmatches
 
-# keypoint_img = cv2.drawKeypoints(ref_img_copy, ref_keypoints, None, flags=cv2.DrawMatchesFlags_DRAW_RICH_KEYPOINTS)
+keypoint_img = cv2.drawKeypoints(ref_img_copy, ref_keypoints, None, flags=cv2.DrawMatchesFlags_DRAW_RICH_KEYPOINTS)
 # keypoint_img2 = cv2.drawKeypoints(img2_copy, kp2, None, flags=cv2.DrawMatchesFlags_DRAW_RICH_KEYPOINTS)
 # img_matching = cv2.drawMatches(ref_img_copy, kp, img2_copy, kp2, matches[:10], None, flags=cv2.DRAW_MATCHES_FLAGS_NOT_DRAW_SINGLE_POINTS)
-# cv2.imshow('ref keypoint',keypoint_img)
+cv2.imshow('ref keypoint',keypoint_img)
 # cv2.imshow('2nd keypoint',keypoint_img2)
 #cv2.imshow('Matches', img_matching)
 # plt.imshow(img_matching), plt.show()
