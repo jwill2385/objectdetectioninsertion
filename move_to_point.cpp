@@ -37,6 +37,8 @@
 
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
+#include <moveit/planning_interface/planning_request.h>
+#include <moveit/planning_interface/planning_response.h>
 
 #include <moveit_msgs/msg/display_robot_state.hpp>
 #include <moveit_msgs/msg/display_trajectory.hpp>
@@ -47,6 +49,7 @@
 #include <moveit/trajectory_processing/iterative_time_parameterization.h>
 #include <string.h>
 #include <cmath>
+#include <tuple>
 
 // All source files that use ROS logging should define a file-specific
 // static const rclcpp::Logger named LOGGER, located at the top of the file
@@ -95,7 +98,15 @@ int main(int argc, char** argv)
       move_group.getCurrentState()->getJointModelGroup(PLANNING_GROUP);
     
   // std::cout << move_group.getCurrentJointValues() << std::endl;
- 
+  // namespace rvt = rviz_visual_tools;
+  // moveit_visual_tools::MoveItVisualTools visual_tools(move_group_node, "panda_link0", "move_group_tutorial",
+  //                                                   move_group.getRobotModel());
+
+  // visual_tools.deleteAllMarkers();
+
+  // /* Remote control is an introspection tool that allows users to step through a high level script */
+  // /* via buttons and keyboard shortcuts in RViz */
+  // visual_tools.loadRemoteControl();
 
   // Getting Basic Information
   // ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -123,17 +134,26 @@ int main(int argc, char** argv)
   geometry_msgs::msg::Pose home_pose;
 
 
-  // home_pose = move_group.getCurrentPose().pose;
-  // home_pose.orientation.x = 0.201768;
-  // home_pose.orientation.y = 0.117524;
-  // home_pose.orientation.z = 0.349232;
-  // home_pose.orientation.w = 0.907477;
+  home_pose = move_group.getCurrentPose().pose;
+  // RCLCPP_INFO(LOGGER, std::to_string(home_pose.orientation.w));
+  // RCLCPP_INFO(LOGGER, std::to_string(home_pose.orientation.x));
+  // RCLCPP_INFO(LOGGER, std::to_string(home_pose.orientation.y));
+  // RCLCPP_INFO(LOGGER, std::to_string(home_pose.orientation.z));
+  // RCLCPP_INFO(LOGGER, std::to_string(home_pose.position.x));
+  // RCLCPP_INFO(LOGGER, std::to_string(home_pose.position.y));
+  // RCLCPP_INFO(LOGGER, std::to_string(home_pose.position.z));
+  home_pose.orientation.x = 0.201768;
+  home_pose.orientation.y = 0.117524;
+  home_pose.orientation.z = 0.349232;
+  home_pose.orientation.w = 0.907477;
 
-  // home_pose.position.x = -0.154819;
-  // home_pose.position.y = 0.284733;
-  // home_pose.position.z = 1.072385;
-  // move_group.setPoseTarget(home_pose);
+  home_pose.position.x = -0.154819;
+  home_pose.position.y = 0.284733;
+  //home_pose.position.z = 1.072385;
+  home_pose.position.z = 0.972385;
+  move_group.setPoseTarget(home_pose);
 
+  //old coordinates
   // // home_pose.orientation.x = 0.2919296;
   // // home_pose.orientation.y = 0.0344387;
   // // home_pose.orientation.z = -0.8963155;
@@ -158,9 +178,8 @@ int main(int argc, char** argv)
   // to actually move the robot.
   moveit::planning_interface::MoveGroupInterface::Plan my_plan;
 
-  // bool success = (move_group.plan(my_plan) == moveit::core::MoveItErrorCode::SUCCESS);
-
-  // RCLCPP_INFO(LOGGER, "Visualizing plan 1 (pose goal) %s", success ? "" : "FAILED");
+  bool suc = (move_group.plan(my_plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
+  RCLCPP_INFO(LOGGER, "Visualizing plan 1 (pose goal) %s", suc ? "" : "FAILED");
 
 
   // Moving to a pose goal
@@ -176,8 +195,18 @@ int main(int argc, char** argv)
 
   /* Uncomment below line when working with a real robot */
   //RCLCPP_INFO(LOGGER, "Moving to target pose");
+  move_group.setMaxVelocityScalingFactor(0.05);
+  move_group.setMaxAccelerationScalingFactor(0.05);
+  move_group.setPlanningTime(20); //Robot needs time to think and plan out path
   //move_group.move();
 
+  RCLCPP_INFO(LOGGER, "Getting Joints");
+  std::vector<double> joints_list;
+  joints_list = move_group.getCurrentJointValues();
+  for (int j = 0; j < joints_list.size(); j++){
+    RCLCPP_INFO(LOGGER, std::to_string(joints_list[j]));
+  }
+  
   // Planning to a joint-space goal
   // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   //
@@ -186,42 +215,112 @@ int main(int argc, char** argv)
   //
   // To start, we'll create an pointer that references the current robot's state.
   // RobotState is the object that contains all the current position/velocity/acceleration data.
-  //moveit::core::RobotStatePtr current_state = move_group.getCurrentState(10);
+  moveit::core::RobotStatePtr current_state = move_group.getCurrentState(10);
   //
   // Next get the current set of joint values for the group.
-  // std::vector<double> joint_group_positions;
-  // current_state->copyJointGroupPositions(joint_model_group, joint_group_positions);
+  std::vector<double> joint_group_positions;
+  current_state->copyJointGroupPositions(joint_model_group, joint_group_positions);
 
   // Now, let's modify one of the joints, plan to the new joint space goal, and visualize the plan.
-  // joint_group_positions[0] = -0.0;  // radians
-  // joint_group_positions[1] = -1.57;
+  // RCLCPP_INFO(LOGGER, std::to_string(joint_group_positions.size()));
+  //   for (int j = 0; j < joint_group_positions.size(); j++){
+  //   RCLCPP_INFO(LOGGER, std::to_string(joint_group_positions[j]));
+  // }
+
+  //Here's my baseline home position
+  joint_group_positions[0] = 1.815762;//-0.654894;  // radians
+  joint_group_positions[1] = -0.727741;//-1.940943;
+  joint_group_positions[2] = -0.907084;//0.122575;
+  joint_group_positions[3] = -0.298450;//-2.416727;
+  joint_group_positions[4] = 1.793496;//-1.589631;
+  joint_group_positions[5] = 3.549144;//2.959874;
+
+  move_group.setJointValueTarget(joint_group_positions);
+  bool succes = (move_group.plan(my_plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
+  RCLCPP_INFO(LOGGER, "Visualizing plan 2 (joint space goal) %s", succes ? "" : "FAILURE");
+  //my_plan = move_group.plan()
+  move_group.setMaxVelocityScalingFactor(0.03);
+  move_group.setMaxAccelerationScalingFactor(0.03);
+  move_group.setPlanningTime(15); //Robot needs time to think and plan out path
+  move_group.move();
+  //move_group.go(wait=true);
+  sleep(5.0);
+
+  //Ideal motion
+  joint_group_positions[0] = -.5880000;  // radians
+  // joint_group_positions[1] = -0.0;
   // joint_group_positions[2] = -0.0;
-  // joint_group_positions[3] = -0.0;
+  joint_group_positions[3] = -.4424895;
   // joint_group_positions[4] = -0.0;
-  // joint_group_positions[5] = -0.0;
-  // move_group.setJointValueTarget(joint_group_positions);
+  //joint_group_positions[5] = -1.0;
+  move_group.setJointValueTarget(joint_group_positions);
 
   // We lower the allowed maximum velocity and acceleration to 5% of their maximum.
   // The default values are 10% (0.1).
   // Set your preferred defaults in the joint_limits.yaml file of your robot's moveit_config
   // or set explicit factors in your code if you need your robot to move faster.
-  move_group.setMaxVelocityScalingFactor(0.05);
-  move_group.setMaxAccelerationScalingFactor(0.05);
+  //move_group.setMaxVelocityScalingFactor(0.05);
+  //move_group.setMaxAccelerationScalingFactor(0.05);
 
-  // success = (move_group.plan(my_plan) == moveit::core::MoveItErrorCode::SUCCESS);
-  // RCLCPP_INFO(LOGGER, "Visualizing plan 2 (joint space goal) %s", success ? "" : "FAILE
-  //move_group.move();
+  succes = (move_group.plan(my_plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
+  RCLCPP_INFO(LOGGER, "Visualizing plan 2 (joint space goal) %s", succes ? "" : "FAILURE");
+  move_group.setPlanningTime(10); //Robot needs time to think and plan out path
+  move_group.move();
 
-  // joint_group_positions[0] = -0.0;  // radians
-  // joint_group_positions[1] = -2.04;
-  // joint_group_positions[2] = 0.52;
-  // joint_group_positions[3] = 1.0472;
-  // joint_group_positions[4] = -0.0;
-  // joint_group_positions[5] = -1.57;
+  //joint_group_positions[3] = -.567189969;
+  joint_group_positions[3] = -.487189969;
+  move_group.setJointValueTarget(joint_group_positions);
+  succes = (move_group.plan(my_plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
+  RCLCPP_INFO(LOGGER, "Visualizing plan 3 (joint space goal) %s", succes ? "" : "FAILURE");
+  move_group.setPlanningTime(10); //Robot needs time to think and plan out path
+  move_group.move();
+  RCLCPP_INFO(LOGGER, std::to_string(joint_group_positions.size()));
+    for (int j = 0; j < joint_group_positions.size(); j++){
+    RCLCPP_INFO(LOGGER, std::to_string(joint_group_positions[j]));
+  }
+  joint_group_positions[0] = -3.1123456;
+  move_group.setJointValueTarget(joint_group_positions);
+  succes = (move_group.plan(my_plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
+  RCLCPP_INFO(LOGGER, "Visualizing plan 4 (joint space goal) %s", succes ? "" : "FAILURE");
+  move_group.setPlanningTime(10); //Robot needs time to think and plan out path
+  move_group.move();
+    // Now, let's modify one of the joints, plan to the new joint space goal, and visualize the plan.
+  RCLCPP_INFO(LOGGER, std::to_string(joint_group_positions.size()));
+    for (int j = 0; j < joint_group_positions.size(); j++){
+    RCLCPP_INFO(LOGGER, std::to_string(joint_group_positions[j]));
+  }
+
+
+  // joint_group_positions[0] = -0.8618593215942383;  // radians
+  //joint_group_positions[1] = -1.349487203410645;
+  joint_group_positions[2] = -0.8476709264567872;
+  //joint_group_positions[3] = -0.3799653524211426;
+  // joint_group_positions[4] = 1.80759859085083;
+  // joint_group_positions[5] = 3.57025146484375;
+  move_group.setJointValueTarget(joint_group_positions);
+  succes = (move_group.plan(my_plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
+  RCLCPP_INFO(LOGGER, "Visualizing plan 5 (joint space goal) %s", succes ? "" : "FAILURE");
+  move_group.setPlanningTime(10); //Robot needs time to think and plan out path
+  move_group.move();
+    // Now, let's modify one of the joints, plan to the new joint space goal, and visualize the plan.
+  RCLCPP_INFO(LOGGER, std::to_string(joint_group_positions.size()));
+    for (int j = 0; j < joint_group_positions.size(); j++){
+    RCLCPP_INFO(LOGGER, std::to_string(joint_group_positions[j]));
+  }
   // move_group.setJointValueTarget(joint_group_positions);
+  // succes = (move_group.plan(my_plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
+  // RCLCPP_INFO(LOGGER, "Visualizing plan 2 (joint space goal) %s", succes ? "" : "FAILURE");
+  // move_group.setPlanningTime(20); //Robot needs time to think and plan out path
+  // move_group.move();
 
-  //move_group.move();
-
+  //Final sweep to complete circle
+  joint_group_positions[0] = -4.800000;
+  //joint_group_positions[2] = -.807084;
+  move_group.setJointValueTarget(joint_group_positions);
+  succes = (move_group.plan(my_plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS);
+  RCLCPP_INFO(LOGGER, "Visualizing plan 2 (joint space goal) %s", succes ? "" : "FAILURE");
+  move_group.setPlanningTime(10); //Robot needs time to think and plan out path
+  move_group.move();
   // // Planning with Path Constraints
   // // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   // //
@@ -300,28 +399,41 @@ int main(int argc, char** argv)
   // // for the end-effector to go through. Note that we are starting
   // // from the new start state above.  The initial pose (start state) does not
   // // need to be added to the waypoint list but adding it can help with visualizations
-  std::vector<geometry_msgs::msg::Pose> waypoints;
+  // std::vector<geometry_msgs::msg::Pose> waypoints;
   //waypoints.push_back(home_pose); // push back home starting position
-  home_pose = move_group.getCurrentPose().pose;
-  geometry_msgs::msg::Pose target_pose3 = home_pose;
+  // home_pose = move_group.getCurrentPose().pose;
+  // geometry_msgs::msg::Pose target_pose3 = home_pose;
 
-  target_pose3.position.z -= 0.1;
-  waypoints.push_back(target_pose3);  
+  // target_pose3.position.z -= 0.2;
+  // waypoints.push_back(target_pose3);  // down
 
-  target_pose3.position.z -= 0.1;
-  waypoints.push_back(target_pose3);  
+  // target_pose3.position.y -= 0.2;
+  // waypoints.push_back(target_pose3);  // right
 
-  target_pose3.position.z += 0.1;
-  waypoints.push_back(target_pose3); 
+  // target_pose3.position.z += 0.2;
+  // target_pose3.position.y += 0.2;
+  // target_pose3.position.x -= 0.2;
+  // waypoints.push_back(target_pose3);  // up and left
+  
+  // target_pose3.position.y -= 0.1;
+  // waypoints.push_back(target_pose3);  
 
-  target_pose3.position.z += 0.1;
-  waypoints.push_back(target_pose3); 
+  // target_pose3.position.y -= 0.1;
+  // waypoints.push_back(target_pose3);  
 
-  target_pose3.position.z += 0.2;
-  waypoints.push_back(target_pose3);  
+  // target_pose3.position.y += 0.1;
+  // waypoints.push_back(target_pose3); 
+
+  // target_pose3.position.y += 0.2;
+  // waypoints.push_back(target_pose3); 
+
+  // target_pose3.position.y += 0.2;
+  // waypoints.push_back(target_pose3);  
 
   //geometry_msgs::msg::Pose target_pose3 = home_pose;
   // Lets move in a circle
+  std::tuple<float, float> Center;
+  Center = std::make_tuple(0.0,0.0);
   double radius = .3; // 1.5ft = .457 meters
   // for (int theta = 0; theta <= 360; theta = theta + 3){
   //   double angle = theta * ( PI / 180.0);
@@ -331,20 +443,21 @@ int main(int argc, char** argv)
   //   //RCLCPP_INFO(LOGGER, std::to_string(target_pose3.position.y));
   //   //RCLCPP_INFO(LOGGER, std::to_string(target_pose3.position.x));
   // }
-  RCLCPP_INFO(LOGGER, "WAYPOINT size: ");
-  RCLCPP_INFO(LOGGER, std::to_string(waypoints.size()));
+  // RCLCPP_INFO(LOGGER, "WAYPOINT size: ");
+  // RCLCPP_INFO(LOGGER, std::to_string(waypoints.size()));
 
   // We want the Cartesian path to be interpolated at a resolution of 1 cm
   // which is why we will specify 0.01 as the max step in Cartesian
   // translation.  We will specify the jump threshold as 0.0, effectively disabling it.
   // Warning - disabling the jump threshold while operating real hardware can cause
   // large unpredictable motions of redundant joints and could be a safety issue
-  moveit_msgs::msg::RobotTrajectory trajectory;
-  move_group.setPlanningTime(20.0);
-  const double jump_threshold = 10.0; // limits maximum distance between two consecutive points
-  const double eef_step = 0.01;
-  double fraction = move_group.computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory);
-  RCLCPP_INFO(LOGGER, "Visualizing plan 4 (Cartesian path) (%.2f%% achieved)", fraction * 100.0);
+
+  // moveit_msgs::msg::RobotTrajectory trajectory;
+  // move_group.setPlanningTime(20.0);
+  // const double jump_threshold = 10.0; // limits maximum distance between two consecutive points
+  // const double eef_step = 0.01;
+  // double fraction = move_group.computeCartesianPath(waypoints, eef_step, jump_threshold, trajectory);
+  // RCLCPP_INFO(LOGGER, "Visualizing plan 4 (Cartesian path) (%.2f%% achieved)", fraction * 100.0);
 
   // // Visualize the plan in RViz
   // visual_tools.deleteAllMarkers();
@@ -362,24 +475,24 @@ int main(int argc, char** argv)
 
   // The ROBOT trajectory needs to be modified so it will include velocities as well.
   //First to create a RobotTrajectory object
-  robot_trajectory::RobotTrajectory rt(move_group.getCurrentState()->getRobotModel(), PLANNING_GROUP);
+  // robot_trajectory::RobotTrajectory rt(move_group.getCurrentState()->getRobotModel(), PLANNING_GROUP);
 
-  // Second get a RobotTrajectory from trajectory
-  rt.setRobotTrajectoryMsg(*move_group.getCurrentState(), trajectory);
+  // // Second get a RobotTrajectory from trajectory
+  // rt.setRobotTrajectoryMsg(*move_group.getCurrentState(), trajectory);
  
-  // Thrid create a IterativeParabolicTimeParameterization object
-  trajectory_processing::IterativeParabolicTimeParameterization iptp;
-  // Fourth compute computeTimeStamps & set max vel, max_acc scale factors
-  bool success = iptp.computeTimeStamps(rt, 0.03, 0.03); // computeTimeStamps(trajectory, max_velscaling_factor, max_accelerationscaling_factor)
-  RCLCPP_INFO(LOGGER, "Computed time stamp %s",success?"SUCCEDED":"FAILED");
-  // Get RobotTrajectory_msg from RobotTrajectory
-  rt.getRobotTrajectoryMsg(trajectory);
+  // // Thrid create a IterativeParabolicTimeParameterization object
+  // trajectory_processing::IterativeParabolicTimeParameterization iptp;
+  // // Fourth compute computeTimeStamps & set max vel, max_acc scale factors
+  // bool success = iptp.computeTimeStamps(rt, 0.03, 0.03); // computeTimeStamps(trajectory, max_velscaling_factor, max_accelerationscaling_factor)
+  // RCLCPP_INFO(LOGGER, "Computed time stamp %s",success?"SUCCEDED":"FAILED");
+  // // Get RobotTrajectory_msg from RobotTrajectory
+  // rt.getRobotTrajectoryMsg(trajectory);
 
-  my_plan.trajectory_ = trajectory;
-  // RCLCPP_INFO(LOGGER, "Visualizing plan 4 (Cartesian path) (%.2f%% achieved)", fraction * 100.0);
-  sleep(5.0);
+  // my_plan.trajectory_ = trajectory;
+  // // RCLCPP_INFO(LOGGER, "Visualizing plan 4 (Cartesian path) (%.2f%% achieved)", fraction * 100.0);
+  // sleep(10.0);
  
-  move_group.execute(my_plan); 
+  // move_group.execute(my_plan); 
   //move_group.execute(trajectory); 
 
   // // Adding objects to the environment
