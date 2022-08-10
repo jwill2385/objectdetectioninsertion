@@ -25,21 +25,25 @@ def time_parser(time):
     seconds = (words[0])[start + 4:]
     start = words[1].find("=")
     nanoseconds = (words[1])[start +1:]
+
     #Now convert objects from strings to integer
-    combined = seconds + "." + nanoseconds
-    # print(combined)
+  
     seconds = int(seconds)
-    nanoseconds = int(nanoseconds)
-    combined = float(combined) #This converts string to float 
+    nanoseconds = int(nanoseconds) * pow(10, -9) # Multiply by 10^-9 to get correct decimal
+
+    combined = seconds + nanoseconds
+
+   
     return seconds, nanoseconds, combined
 
 
 # create reader instance and open for reading
 #STEP 1: select bag file path and image save path location
-img_save_path = "/home/cvdarbeloff/Documents/Realsense/realsense_depth/roscam_images"
-bag_path = "/home/cvdarbeloff/workspace/bag_files/camera_and_joints"
-csv_path = "/home/cvdarbeloff/workspace/ros_ur_driver/src/move_arm/src/joint_storage.csv"
-txt_path = "/home/cvdarbeloff/workspace/ros_ur_driver/src/move_arm/src/picture_times.txt"
+img_save_path = "/home/cvdarbeloff/Documents/Realsense/realsense_depth/roscam_images_path2"
+bag_path = "/home/cvdarbeloff/workspace/bag_files/circle_path_2"
+csv_path = "/home/cvdarbeloff/workspace/ros_ur_driver/src/move_arm/src/joint_storage_2.csv"
+txt_path = "/home/cvdarbeloff/workspace/ros_ur_driver/src/move_arm/src/joint_times.txt"
+photo_txt_path = "/home/cvdarbeloff/workspace/ros_ur_driver/src/move_arm/src/photo_times.txt"
 bridge = CvBridge()
 #cv2.namedWindow("Color_frame")
 array = []
@@ -52,32 +56,31 @@ with Reader(bag_path) as reader:
         print(connection.topic, connection.msgtype)
 
     # iterate over messages
-    img_counter = 0
     # There are 2 message types here sensor_msgs/msg/Image, and sensor_msgs/msg/JointState
     # 2 connection topics /camera/color/image_raw, /joint_states
     num_photos = 0
     num_states = 0
-    #TODO: Read all timesteps of image into an array
-    # Read all timesteps for joint states. Match each img timestep with one from joint state. save to CSV
+    #Initialize photo time array and joint dictionary
     photo_times = []
     joint_data = {}
     for connection, timestamp, rawdata in reader.messages():
         if connection.topic == '/camera/color/image_raw' :
+            # Read image data
             msg = deserialize_cdr(rawdata, connection.msgtype) #converts data into a readable format
             cv_image = bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8') #save to bgr image format
-            img_name = "auto_base_{}.jpg".format(img_counter)
+            img_name = "auto_base_{}.jpg".format(num_photos)
             time = str(msg.header.stamp)
+            # print(time)
             sec, nano, exact_time = time_parser(time)
-            # print(exact_time)
             # store image in correct folder
-            currnet_pic = cv2.imwrite(os.path.join(img_save_path, img_name), cv_image)
-            print("{} written".format(img_name))
+            # currnet_pic = cv2.imwrite(os.path.join(img_save_path, img_name), cv_image)
+            # print("{} written".format(img_name))
 
             num_photos += 1
             photo_times.append(exact_time)
             # print(msg.header.stamp)
-            img_counter += 1
         if connection.topic == '/joint_states' :
+            # Read joint Data
             msg = deserialize_cdr(rawdata, connection.msgtype) #converts data into a readable format
             time = str(msg.header.stamp)
             sec, nano, exact_time = time_parser(time)
@@ -86,13 +89,10 @@ with Reader(bag_path) as reader:
             vel = msg.velocity
             eff = msg.effort
             joint_data[exact_time] = [p, vel, eff]
-            num_states +=1
+            num_states += 1
     
   
-        key = cv2.waitKey(1)
-        # cv2.imshow('Color_frame', cv_image)
-        if key == ord('q'):
-            break
+
         
     print("Photo count", num_photos)
     print('State count', num_states)
@@ -100,7 +100,17 @@ with Reader(bag_path) as reader:
 
 # Now That I have all joint data and times match each time to a joint
 matches = 0 
+# Write to txt file
+# with open(txt_path, 'w') as file:
+#     for key in joint_data:
+#         file.write(str(key))
+#         file.write('\n')
+# with open(photo_txt_path, 'w') as file:
+#     for t in photo_times:
+#         file.write(str(t))
+#         file.write('\n')
 
+# WRITE TO CSV FILE
 with open(csv_path, 'w', encoding='UTF8') as cfile:
     data_writer = csv.writer(cfile, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
     # Write header row
@@ -112,7 +122,9 @@ with open(csv_path, 'w', encoding='UTF8') as cfile:
         for key in joint_data:
             if key >= t:
                 # We have found closest joint reading
-                # print('Found')
+                print('Found')
+                print('Photo', t)
+                print('Joint', key)
                 p, vel, eff = joint_data[key]
                 data_writer.writerow([t, p[0], p[1], p[2], p[3], p[4], p[5], vel[0], vel[1], vel[2], 
                 vel[3], vel[4], vel[5], eff[0], eff[1], eff[2], eff[3], eff[4], eff[5]])
