@@ -37,7 +37,7 @@ class MinimalPublisher : public rclcpp::Node
       
       publisher_ = this->create_publisher<geometry_msgs::msg::Pose>("end_effector_talker", 10);
       timer_ = this->create_wall_timer(
-      10ms, std::bind(&MinimalPublisher::timer_callback, this));
+      50ms, std::bind(&MinimalPublisher::timer_callback, this));
       // 2ms timer means callback executes 500 times a second
     }
 
@@ -49,27 +49,27 @@ class MinimalPublisher : public rclcpp::Node
       rclcpp::NodeOptions node_options;
       node_options.automatically_declare_parameters_from_overrides(true);
       auto move_group_node = rclcpp::Node::make_shared("move_group_end_effect", node_options);
-        // We spin up a SingleThreadedExecutor for the current state monitor to get information
+      // We spin up a SingleThreadedExecutor for the current state monitor to get information
       // about the robot's state.
-      rclcpp::executors::SingleThreadedExecutor executor;
+      //rclcpp::executors::SingleThreadedExecutor executor;
+      rclcpp::executors::MultiThreadedExecutor executor;
       executor.add_node(move_group_node);
       std::thread([&executor]() { executor.spin(); }).detach();
 
       //static const std::string PLANNING_GROUP = "ur_manipulator";
       moveit::planning_interface::MoveGroupInterface move_group(move_group_node, PLANNING_GROUP);
       home_pose = move_group.getCurrentPose().pose;
+      RCLCPP_INFO(LOGGER, std::to_string(home_pose.orientation.w));
       auto pose_message = geometry_msgs::msg::Pose();
-      //home_pose = current_move_group.getCurrentPose().pose;
       pose_message = home_pose;
-      RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", std::to_string(count_++));
+      RCLCPP_INFO(this->get_logger(), "Publishing: %d", count_++);
       publisher_->publish(pose_message);
     }
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr publisher_;
-    int num_;
     //moveit::planning_interface::MoveGroupInterface current_move_group;
     geometry_msgs::msg::Pose home_pose;
-    size_t count_;
+    int count_;
     //NOTE: Try to add new pose variable here
 };
 
