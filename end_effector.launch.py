@@ -159,7 +159,7 @@ def generate_launch_description():
 
     # MoveGroupInterface demo executable
     move_group_demo = Node(
-        name="move_group_end_effect",
+        #name="move_group_end_effect",
         package="move_arm",
         executable="end_effector_talker",
         output="screen",
