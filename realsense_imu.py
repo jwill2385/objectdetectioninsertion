@@ -2,6 +2,8 @@ import cv2
 import pyrealsense2 as rs
 import math
 import os
+import csv
+import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -36,7 +38,8 @@ import numpy as np
 
 
 
-
+img_save_path = '/home/cvdarbeloff/Documents/Realsense/realsense_depth/pendulum_photos'
+csv_file = "cart_pend_imu.csv"
 theta = []
 thetadot = []
 def initialize_camera():
@@ -131,17 +134,35 @@ try:
         else:
             theta.append(0)
         thetadot.append(float(gyro.z))
+        #lets save images to a folder
+        img_name = "pend_img{}.jpg".format(counter)
+        currnet_pic = cv2.imwrite(os.path.join(img_save_path, img_name), color_image)
+        print("{} written".format(img_name))
         counter += 1
-        if counter == 3000:
+        if counter == 700:
             flag = False
-        cv2.imshow("Color_frame", color_image)
-        key = cv2.waitKey(1)
-        if key == ord('q'):
-            break
+        # cv2.imshow("Color_frame", color_image)
+        # key = cv2.waitKey(1)
+        # if key == ord('q'):
+        #     break
 finally:
 
     fig, ax = plt.subplots(ncols=1, nrows=2, figsize=(8, 10))
     ax[0].plot(np.array(theta))
     ax[1].plot(np.array(thetadot))
+    ax[0].set_title('Pendulum Theta Values')
+    ax[1].set_title('Pendulum Angular Velocity')
     plt.show()
     p.stop()
+
+    # create an excel sheet to export the data
+    angles = np.array([theta]).T
+    ang_veloicities = np.array([thetadot]).T
+    combinedataset = np.concatenate((angles, ang_veloicities), axis =1)
+    DF = pd.DataFrame(combinedataset)
+    DF.to_csv(csv_file)
+    # with open(csv_file, "w") as outfile:
+    #     writer = csv.writer(outfile)
+    #     writer.writerow(theta)
+    #     writer.writerow(thetadot)
+        # writer.writerows(zip(*trajectory.values()))
